@@ -35,6 +35,7 @@ import {
 	Pencil,
 	Plus,
 	Puzzle,
+	Search, // CUSTOM: project-switcher-search
 	Server,
 	ServerCog,
 	Settings,
@@ -112,6 +113,7 @@ import { usePluginRegistry } from "@/lib/plugins/registry";
 import {
 	projectQueryOptions,
 	projectsInfiniteQueryOptions,
+	projectsLookupInfiniteQueryOptions, // CUSTOM: project-switcher-search
 } from "@/lib/project-api";
 import { projectAvatar } from "@/lib/provider-logos";
 import { createLoadMoreScrollHandler } from "@/lib/scroll-pagination";
@@ -895,6 +897,51 @@ function ProjectSwitcher({
 	});
 	const label = currentProject?.name ?? t("projectSwitcher.projects");
 
+	// CUSTOM: project-switcher-search
+	// The API has no project search param, so while a filter is typed we drain
+	// the separate "lookup" cache entry (never the shared "Load more" one) and
+	// filter every loaded project client-side by name/description.
+	const [filter, setFilter] = useState("");
+	const needle = filter.trim().toLowerCase();
+	const searching = needle.length > 0;
+	const {
+		data: lookupData,
+		fetchNextPage: fetchNextLookupPage,
+		hasNextPage: hasNextLookupPage,
+		isFetchingNextPage: isFetchingNextLookupPage,
+	} = useInfiniteQuery({
+		...projectsLookupInfiniteQueryOptions(),
+		enabled: searching,
+	});
+	useEffect(() => {
+		if (searching && hasNextLookupPage && !isFetchingNextLookupPage) {
+			void fetchNextLookupPage();
+		}
+	}, [
+		searching,
+		hasNextLookupPage,
+		isFetchingNextLookupPage,
+		fetchNextLookupPage,
+	]);
+	const lookupProjects = useMemo(
+		() => lookupData?.pages.flatMap((p) => p.items) ?? [],
+		[lookupData],
+	);
+	const visibleProjects = useMemo(() => {
+		if (!searching) return projects;
+		return (lookupData ? lookupProjects : projects).filter(
+			(p) =>
+				p.name.toLowerCase().includes(needle) ||
+				(p.description ?? "").toLowerCase().includes(needle),
+		);
+	}, [searching, needle, lookupData, lookupProjects, projects]);
+	const searchingMore =
+		searching && (!lookupData || hasNextLookupPage || isFetchingNextLookupPage);
+	// Stable ref: Base UI focuses the popup after mount, so focus the field after that.
+	const focusSearch = useCallback((el: HTMLInputElement | null) => {
+		if (el) setTimeout(() => el.focus(), 0);
+	}, []);
+
 	const { data: user } = useQuery(currentUserQueryOptions);
 
 	if (!user) {
@@ -913,7 +960,13 @@ function ProjectSwitcher({
 	}
 
 	return (
-		<DropdownMenu open={open} onOpenChange={setOpen}>
+		<DropdownMenu
+			open={open}
+			onOpenChange={(next) => {
+				setOpen(next);
+				if (!next) setFilter(""); // CUSTOM: project-switcher-search
+			}}
+		>
 			<DropdownMenuTrigger
 				className={cn(
 					"flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm font-medium text-sidebar-foreground/80 transition-all duration-150 select-none cursor-pointer",
@@ -948,10 +1001,34 @@ function ProjectSwitcher({
 						{t("projectSwitcher.yourProjects")}
 					</DropdownMenuLabel>
 				</DropdownMenuGroup>
+				{/* CUSTOM: project-switcher-search */}
+				<div className="sticky top-0 z-10 bg-popover px-0.5 pb-1">
+					<div className="relative">
+						<Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+						<Input
+							ref={focusSearch}
+							value={filter}
+							onChange={(e) => setFilter(e.target.value)}
+							onKeyDown={(e) => {
+								// Keep typed characters away from the menu's typeahead; leave
+								// arrows/Escape/Tab to bubble for navigation and closing.
+								if (
+									!["ArrowDown", "ArrowUp", "Escape", "Tab"].includes(e.key)
+								) {
+									e.stopPropagation();
+								}
+							}}
+							placeholder={t("projectSwitcher.searchPlaceholder")}
+							aria-label={t("projectSwitcher.searchPlaceholder")}
+							autoComplete="off"
+							className="h-7 pl-7 text-xs md:text-xs"
+						/>
+					</div>
+				</div>
 				<DropdownMenuSeparator />
-				{projects.length > 0 ? (
+				{visibleProjects.length > 0 ? (
 					<DropdownMenuGroup>
-						{projects.map((p) => (
+						{visibleProjects.map((p) => (
 							<DropdownMenuItem
 								key={p.id}
 								render={
@@ -974,7 +1051,7 @@ function ProjectSwitcher({
 								)}
 							</DropdownMenuItem>
 						))}
-						{isFetchingNextPage ? (
+						{isFetchingNextPage || searchingMore ? (
 							<div className="flex items-center justify-center gap-1.5 py-2 text-xs text-muted-foreground">
 								<Loader2 className="size-3 animate-spin" />
 								{t("projectSwitcher.loadingMore")}
@@ -987,7 +1064,12 @@ function ProjectSwitcher({
 							<FolderKanban className="size-4 text-muted-foreground" />
 						</div>
 						<p className="text-xs text-muted-foreground mt-0.5">
-							{t("projectSwitcher.noProjectsYet")}
+							{/* CUSTOM: project-switcher-search */}
+							{searching
+								? searchingMore
+									? t("projectSwitcher.loadingMore")
+									: t("projectSwitcher.noMatch")
+								: t("projectSwitcher.noProjectsYet")}
 						</p>
 					</div>
 				)}
