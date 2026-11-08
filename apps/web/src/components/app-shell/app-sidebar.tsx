@@ -937,10 +937,14 @@ function ProjectSwitcher({
 	}, [searching, needle, lookupData, lookupProjects, projects]);
 	const searchingMore =
 		searching && (!lookupData || hasNextLookupPage || isFetchingNextLookupPage);
-	// Stable ref: Base UI focuses the popup after mount, so focus the field after that.
-	const focusSearch = useCallback((el: HTMLInputElement | null) => {
-		if (el) setTimeout(() => el.focus(), 0);
-	}, []);
+	// Base UI focuses the popup after it opens, so focus the field after that
+	// (on every open, not only the first mount).
+	const searchInputRef = useRef<HTMLInputElement | null>(null);
+	useEffect(() => {
+		if (!open) return;
+		const id = setTimeout(() => searchInputRef.current?.focus(), 0);
+		return () => clearTimeout(id);
+	}, [open]);
 
 	const { data: user } = useQuery(currentUserQueryOptions);
 
@@ -1006,7 +1010,7 @@ function ProjectSwitcher({
 					<div className="relative">
 						<Search className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
 						<Input
-							ref={focusSearch}
+							ref={searchInputRef}
 							value={filter}
 							onChange={(e) => setFilter(e.target.value)}
 							onKeyDown={(e) => {
