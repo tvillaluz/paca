@@ -38,7 +38,9 @@
 		"yourProjects": "내 프로젝트",
 		"noProjectsYet": "아직 프로젝트가 없습니다",
 		"newProject": "새 프로젝트",
-		"loadingMore": "불러오는 중…"
+		"loadingMore": "불러오는 중…",
+		"searchPlaceholder": "프로젝트 검색…",
+		"noMatch": "일치하는 프로젝트가 없습니다"
 	},
 	"interactions": {
 		"title": "인터랙션",

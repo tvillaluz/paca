@@ -38,7 +38,9 @@
 		"yourProjects": "Tus proyectos",
 		"noProjectsYet": "Aún no hay proyectos",
 		"newProject": "Nuevo proyecto",
-		"loadingMore": "Cargando más…"
+		"loadingMore": "Cargando más…",
+		"searchPlaceholder": "Buscar proyectos…",
+		"noMatch": "Ningún proyecto coincide"
 	},
 	"interactions": {
 		"title": "Interacciones",
